@@ -9,6 +9,8 @@ const EnvSchema = z.object({
     PORT: z.coerce.number(),
     LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']),
     DB_URL: z.string(),
+    JWT_SECRET: z.string().min(32, "JWT secret must be at least 32 characters long"),
+    REDIS_URL: z.string().startsWith("redis://").or(z.string().startsWith("rediss://")),
 }).transform((data) => {
     if (data.NODE_ENV === 'test') {
         return {

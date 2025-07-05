@@ -1,5 +1,6 @@
 import { integer, text, sqliteTable, real, index } from "drizzle-orm/sqlite-core";
 import { relations } from "drizzle-orm";
+import { createSelectSchema } from "drizzle-zod";
 
 const timestamps = {
     createdAt: integer("created_at", { mode: "timestamp" })
@@ -22,6 +23,10 @@ export const teachers = sqliteTable("teachers", {
     ...timestamps
 });
 
+export const teacherSelectSchema = createSelectSchema(teachers).omit({
+    passwordHash: true,
+})
+
 // Parents table
 export const parents = sqliteTable("parents", {
     id: text("id").primaryKey(),
@@ -33,6 +38,10 @@ export const parents = sqliteTable("parents", {
     isActive: integer("is_active", { mode: "boolean" }).default(true),
     ...timestamps
 });
+
+export const parentsSelectSchema = createSelectSchema(parents).omit({
+    passwordHash: true,
+})
 
 // Children/Students table
 export const children = sqliteTable("children", {
