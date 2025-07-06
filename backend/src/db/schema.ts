@@ -1,6 +1,7 @@
 import { integer, text, sqliteTable, real, index } from "drizzle-orm/sqlite-core";
 import { relations } from "drizzle-orm";
-import { createSelectSchema } from "drizzle-zod";
+import { createInsertSchema, createSelectSchema } from "drizzle-zod";
+import { z } from "zod";
 
 const timestamps = {
     createdAt: integer("created_at", { mode: "timestamp" })
@@ -12,40 +13,60 @@ const timestamps = {
 
 // Teachers table
 export const teachers = sqliteTable("teachers", {
-    id: text("id").primaryKey(),
-    email: text("email").unique().notNull(),
-    firstName: text("first_name").notNull(),
-    lastName: text("last_name").notNull(),
-    passwordHash: text("password_hash").notNull(),
-    bio: text("bio"),
-    specializations: text("specializations"), // JSON array of programming languages/topics
-    isActive: integer("is_active", { mode: "boolean" }).default(true),
-    ...timestamps
-});
-
-export const teacherSelectSchema = createSelectSchema(teachers).omit({
-    passwordHash: true,
-})
-
-// Parents table
-export const parents = sqliteTable("parents", {
-    id: text("id").primaryKey(),
+    id: text("id").primaryKey().$default(() => Bun.randomUUIDv7()),
     email: text("email").unique().notNull(),
     firstName: text("first_name").notNull(),
     lastName: text("last_name").notNull(),
     passwordHash: text("password_hash").notNull(),
     phone: text("phone"),
-    isActive: integer("is_active", { mode: "boolean" }).default(true),
+    bio: text("bio"),
+    specializations: text("specializations"), // JSON array of programming languages/topics
     ...timestamps
 });
 
-export const parentsSelectSchema = createSelectSchema(parents).omit({
+export const teachersSelectSchema = createSelectSchema(teachers).omit({
     passwordHash: true,
 })
+export const teachersInsertSchema = createInsertSchema(teachers)
+    .merge(z.object({
+        password: z.string().min(6, "Password must be at least 6 characters long")
+    }))
+    .omit({
+        id: true,
+        createdAt: true,
+        updatedAt: true,
+        passwordHash: true,
+    })
+
+// Parents table
+export const parents = sqliteTable("parents", {
+    id: text("id").primaryKey().$default(() => Bun.randomUUIDv7()),
+    email: text("email").unique().notNull(),
+    firstName: text("first_name").notNull(),
+    lastName: text("last_name").notNull(),
+    passwordHash: text("password_hash").notNull(),
+    phone: text("phone"),
+    ...timestamps
+});
+
+export const parentsSelectSchema = createSelectSchema(parents)
+    .omit({
+        passwordHash: true,
+    })
+export const parentsInsertSchema = createInsertSchema(parents)
+    .merge(z.object({
+        password: z.string().min(6, "Password must be at least 6 characters long")
+    }))
+    .omit({
+        id: true,
+        createdAt: true,
+        updatedAt: true,
+        passwordHash: true,
+    })
 
 // Children/Students table
 export const children = sqliteTable("children", {
-    id: text("id").primaryKey(),
+    id: text("id").primaryKey().$default(() => Bun.randomUUIDv7()),
     firstName: text("first_name").notNull(),
     lastName: text("last_name").notNull(),
     age: integer("age").notNull(),
@@ -53,7 +74,7 @@ export const children = sqliteTable("children", {
     primaryTeacherId: text("primary_teacher_id").references(() => teachers.id, { onDelete: 'cascade' }),
     programmingLevel: text("programming_level").default("beginner"), // beginner, intermediate, advanced
     notes: text("notes"), // General notes about the child
-    isActive: integer("is_active", { mode: "boolean" }).default(true),
+    isActive: integer("is_active", { mode: "boolean" }),
     ...timestamps
 }, (table) => ({
     parentIdIdx: index("children_parent_id_idx").on(table.parentId),
@@ -62,7 +83,7 @@ export const children = sqliteTable("children", {
 
 // Lessons table
 export const lessons = sqliteTable("lessons", {
-    id: text("id").primaryKey(),
+    id: text("id").primaryKey().$default(() => Bun.randomUUIDv7()),
     teacherId: text("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
     childId: text("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }),
     title: text("title").notNull(),
@@ -83,7 +104,7 @@ export const lessons = sqliteTable("lessons", {
 
 // Lesson summaries (AI-generated summaries for parents)
 export const lessonSummaries = sqliteTable("lesson_summaries", {
-    id: text("id").primaryKey(),
+    id: text("id").primaryKey().$default(() => Bun.randomUUIDv7()),
     lessonId: text("lesson_id").unique().notNull().references(() => lessons.id, { onDelete: 'cascade' }),
     topicsCovered: text("topics_covered"), // JSON array of topics
     childParticipation: text("child_participation"), // How the child participated
@@ -98,7 +119,7 @@ export const lessonSummaries = sqliteTable("lesson_summaries", {
 
 // Homework table
 export const homework = sqliteTable("homework", {
-    id: text("id").primaryKey(),
+    id: text("id").primaryKey().$default(() => Bun.randomUUIDv7()),
     lessonId: text("lesson_id").notNull().references(() => lessons.id, { onDelete: 'cascade' }),
     childId: text("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }),
     teacherId: text("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
@@ -119,7 +140,7 @@ export const homework = sqliteTable("homework", {
 
 // Homework submissions
 export const homeworkSubmissions = sqliteTable("homework_submissions", {
-    id: text("id").primaryKey(),
+    id: text("id").primaryKey().$default(() => Bun.randomUUIDv7()),
     homeworkId: text("homework_id").notNull().references(() => homework.id, { onDelete: 'cascade' }),
     childId: text("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }),
     submissionText: text("submission_text"), // Text content of the submission
@@ -135,7 +156,7 @@ export const homeworkSubmissions = sqliteTable("homework_submissions", {
 
 // Homework feedback and corrections
 export const homeworkFeedback = sqliteTable("homework_feedback", {
-    id: text("id").primaryKey(),
+    id: text("id").primaryKey().$default(() => Bun.randomUUIDv7()),
     submissionId: text("submission_id").notNull().references(() => homeworkSubmissions.id, { onDelete: 'cascade' }),
     teacherId: text("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
     grade: text("grade"), // A, B, C, D, F or numerical
@@ -152,7 +173,7 @@ export const homeworkFeedback = sqliteTable("homework_feedback", {
 
 // Personal goals for each child
 export const childGoals = sqliteTable("child_goals", {
-    id: text("id").primaryKey(),
+    id: text("id").primaryKey().$default(() => Bun.randomUUIDv7()),
     childId: text("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }),
     teacherId: text("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
     title: text("title").notNull(),
@@ -171,7 +192,7 @@ export const childGoals = sqliteTable("child_goals", {
 
 // Messages between parents and teachers
 export const messages = sqliteTable("messages", {
-    id: text("id").primaryKey(),
+    id: text("id").primaryKey().$default(() => Bun.randomUUIDv7()),
     senderId: text("sender_id").notNull(), // Can be parent or teacher ID
     senderType: text("sender_type").notNull(), // "parent" or "teacher"
     receiverId: text("receiver_id").notNull(), // Can be parent or teacher ID
@@ -192,7 +213,7 @@ export const messages = sqliteTable("messages", {
 
 // Child portfolio - projects, websites, games, etc.
 export const portfolioItems = sqliteTable("portfolio_items", {
-    id: text("id").primaryKey(),
+    id: text("id").primaryKey().$default(() => Bun.randomUUIDv7()),
     childId: text("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }),
     teacherId: text("teacher_id").references(() => teachers.id, { onDelete: 'cascade' }), // Teacher who helped/supervised
     title: text("title").notNull(),
@@ -217,7 +238,7 @@ export const portfolioItems = sqliteTable("portfolio_items", {
 
 // Teacher-Child assignments (many-to-many relationship)
 export const teacherChildAssignments = sqliteTable("teacher_child_assignments", {
-    id: text("id").primaryKey(),
+    id: text("id").primaryKey().$default(() => Bun.randomUUIDv7()),
     teacherId: text("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
     childId: text("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }),
     isPrimary: integer("is_primary", { mode: "boolean" }).default(false), // Primary teacher for the child

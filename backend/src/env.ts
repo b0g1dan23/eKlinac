@@ -11,6 +11,8 @@ const EnvSchema = z.object({
     DB_URL: z.string(),
     JWT_SECRET: z.string().min(32, "JWT secret must be at least 32 characters long"),
     REDIS_URL: z.string().startsWith("redis://").or(z.string().startsWith("rediss://")),
+    ADMIN_USERNAME: z.string().min(3, "Admin username must be at least 3 characters long"),
+    ADMIN_PASSWORD: z.string().min(6, "Admin password must be at least 6 characters long"),
 }).transform((data) => {
     if (data.NODE_ENV === 'test') {
         return {
