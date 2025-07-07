@@ -8,7 +8,7 @@ export default function configureOpenAPI(app: AppOpenAPI) {
         openapi: "3.0.0",
         info: {
             version: packageJSON.version,
-            title: "AI Note-to-Contact API",
+            title: "Online Learning Platform API",
         }
     })
 

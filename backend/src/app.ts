@@ -3,16 +3,16 @@ import { expand } from 'dotenv-expand';
 import { createApp } from './lib/create-app';
 import configureOpenAPI from './lib/configure-open-api';
 import authRouter from './routes/auth/auth.index';
-import index from './routes/index.route';
 import configureCORS from './lib/configure-cors';
+import teachersRouter from './routes/teachers/teachers.index';
 
 expand(config());
 
 const app = createApp();
 
 const routes = [
-    index,
     authRouter,
+    teachersRouter,
 ]
 
 configureCORS(app);

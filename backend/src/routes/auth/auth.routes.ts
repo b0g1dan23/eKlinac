@@ -18,6 +18,7 @@ export const loginRoute = createRoute({
     path: "/auth/login",
     method: "post",
     tags: ["auth"],
+    description: "User login route. Allows teachers and parents to log in using email and password.",
     request: {
         body: jsonContentRequired(loginBodySchema, "Login request body"),
         query: z.object({
@@ -37,10 +38,23 @@ export const loginRoute = createRoute({
     }
 })
 
+export const logoutRoute = createRoute({
+    path: '/auth/logout',
+    method: 'post',
+    tags: ['auth'],
+    description: "User logout route. Invalidates the current session by clearing cookies.",
+    middleware: [verifyRefreshToken],
+    responses: {
+        [OK]: jsonContent(z.object({ message: z.string() }), "Successful logout response"),
+        [UNAUTHORIZED]: jsonContent(z.object({ message: z.string() }), "Unauthorized access response"),
+    }
+})
+
 export const refreshRoute = createRoute({
     path: '/auth/refresh',
     method: 'post',
     tags: ['auth'],
+    description: "Refresh access token using a valid refresh token stored in cookies.",
     middleware: [verifyRefreshToken],
     request: {
         cookies: z.object({
@@ -60,6 +74,7 @@ export const registerRoute = createRoute({
     path: "/auth/register",
     method: "post",
     tags: ["auth"],
+    description: "Parent registration route. Creates a new parent account.",
     request: {
         body: jsonContentRequired(parentsInsertSchema, "Registration request body")
     },
@@ -74,6 +89,7 @@ export const adminLoginRoute = createRoute({
     path: "/auth/admin/login",
     method: "post",
     tags: ["auth"],
+    description: "Admin login route.",
     middleware: [rateLimiter({
         windowMs: 60 * 60 * 1000,
         limit: 3,
@@ -104,6 +120,7 @@ export const createTeacherRoute = createRoute({
     path: "/auth/create-teacher",
     method: "post",
     tags: ["auth"],
+    description: "Create a new teacher account. Only accessible by admins.",
     middleware: [verifyAdminAccess],
     request: {
         body: jsonContentRequired(teachersInsertSchema, "Create teacher request body"),
@@ -116,6 +133,7 @@ export const createTeacherRoute = createRoute({
 })
 
 export type LoginRoute = typeof loginRoute;
+export type LogoutRoute = typeof logoutRoute;
 export type RefreshRoute = typeof refreshRoute;
 export type RegisterRoute = typeof registerRoute;
 export type AdminLoginRoute = typeof adminLoginRoute;
