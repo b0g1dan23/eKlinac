@@ -1,19 +1,16 @@
-import { integer, text, sqliteTable, real, index } from "drizzle-orm/sqlite-core";
+import { integer, text, real, index, boolean, timestamp, pgTable, uuid } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
 const timestamps = {
-    createdAt: integer("created_at", { mode: "timestamp" })
-        .$defaultFn(() => new Date()),
-    updatedAt: integer("updated_at", { mode: "timestamp" })
-        .$defaultFn(() => new Date())
-        .$onUpdate(() => new Date())
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull()
 }
 
 // Teachers table
-export const teachers = sqliteTable("teachers", {
-    id: text("id").primaryKey().$default(() => Bun.randomUUIDv7()),
+export const teachers = pgTable("teachers", {
+    id: uuid("id").primaryKey().defaultRandom(),
     email: text("email").unique().notNull(),
     firstName: text("first_name").notNull(),
     lastName: text("last_name").notNull(),
@@ -39,8 +36,8 @@ export const teachersInsertSchema = createInsertSchema(teachers)
     })
 
 // Parents table
-export const parents = sqliteTable("parents", {
-    id: text("id").primaryKey().$default(() => Bun.randomUUIDv7()),
+export const parents = pgTable("parents", {
+    id: uuid("id").primaryKey().defaultRandom(),
     email: text("email").unique().notNull(),
     firstName: text("first_name").notNull(),
     lastName: text("last_name").notNull(),
@@ -65,36 +62,38 @@ export const parentsInsertSchema = createInsertSchema(parents)
     })
 
 // Children/Students table
-export const children = sqliteTable("children", {
-    id: text("id").primaryKey().$default(() => Bun.randomUUIDv7()),
+export const children = pgTable("children", {
+    id: uuid("id").primaryKey().defaultRandom(),
     firstName: text("first_name").notNull(),
     lastName: text("last_name").notNull(),
     age: integer("age").notNull(),
-    parentId: text("parent_id").notNull().references(() => parents.id, { onDelete: 'cascade' }),
-    primaryTeacherId: text("primary_teacher_id").references(() => teachers.id, { onDelete: 'cascade' }),
+    parentId: uuid("parent_id").notNull().references(() => parents.id, { onDelete: 'cascade' }),
+    primaryTeacherId: uuid("primary_teacher_id").references(() => teachers.id, { onDelete: 'cascade' }),
     programmingLevel: text("programming_level").default("beginner"), // beginner, intermediate, advanced
     notes: text("notes"), // General notes about the child
-    isActive: integer("is_active", { mode: "boolean" }),
+    isActive: boolean("is_active").default(true),
     ...timestamps
 }, (table) => ({
     parentIdIdx: index("children_parent_id_idx").on(table.parentId),
     teacherIdIdx: index("children_teacher_id_idx").on(table.primaryTeacherId)
 }));
 
+export const childrenSelectSchema = createSelectSchema(children);
+
 // Lessons table
-export const lessons = sqliteTable("lessons", {
-    id: text("id").primaryKey().$default(() => Bun.randomUUIDv7()),
-    teacherId: text("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
-    childId: text("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }),
+export const lessons = pgTable("lessons", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    teacherId: uuid("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
+    childId: uuid("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }),
     title: text("title").notNull(),
     description: text("description"),
     notes: text("notes"), // Teacher's notes from the lesson
     recordingUrl: text("recording_url"), // Link to the lesson recording
     duration: integer("duration"), // Duration in minutes
     status: text("status").default("scheduled"), // scheduled, completed, cancelled
-    scheduledAt: integer("scheduled_at", { mode: "timestamp" }).notNull(),
-    startedAt: integer("started_at", { mode: "timestamp" }),
-    endedAt: integer("ended_at", { mode: "timestamp" }),
+    scheduledAt: timestamp("scheduled_at").notNull(),
+    startedAt: timestamp("started_at"),
+    endedAt: timestamp("ended_at"),
     ...timestamps
 }, (table) => ({
     teacherIdIdx: index("lessons_teacher_id_idx").on(table.teacherId),
@@ -103,30 +102,30 @@ export const lessons = sqliteTable("lessons", {
 }));
 
 // Lesson summaries (AI-generated summaries for parents)
-export const lessonSummaries = sqliteTable("lesson_summaries", {
-    id: text("id").primaryKey().$default(() => Bun.randomUUIDv7()),
-    lessonId: text("lesson_id").unique().notNull().references(() => lessons.id, { onDelete: 'cascade' }),
+export const lessonSummaries = pgTable("lesson_summaries", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    lessonId: uuid("lesson_id").unique().notNull().references(() => lessons.id, { onDelete: 'cascade' }),
     topicsCovered: text("topics_covered"), // JSON array of topics
     childParticipation: text("child_participation"), // How the child participated
     strengths: text("strengths"), // What the child is doing well
     difficulties: text("difficulties"), // Where the child has difficulties
     recommendations: text("recommendations"), // Recommendations for improvement
-    generatedAt: integer("generated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+    generatedAt: timestamp("generated_at").defaultNow(),
     ...timestamps
 }, (table) => ({
     lessonIdIdx: index("lesson_summaries_lesson_id_idx").on(table.lessonId)
 }));
 
 // Homework table
-export const homework = sqliteTable("homework", {
-    id: text("id").primaryKey().$default(() => Bun.randomUUIDv7()),
-    lessonId: text("lesson_id").notNull().references(() => lessons.id, { onDelete: 'cascade' }),
-    childId: text("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }),
-    teacherId: text("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
+export const homework = pgTable("homework", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    lessonId: uuid("lesson_id").notNull().references(() => lessons.id, { onDelete: 'cascade' }),
+    childId: uuid("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }),
+    teacherId: uuid("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
     title: text("title").notNull(),
     description: text("description").notNull(),
     instructions: text("instructions"), // Detailed instructions
-    dueDate: integer("due_date", { mode: "timestamp" }).notNull(),
+    dueDate: timestamp("due_date").notNull(),
     difficulty: text("difficulty").default("medium"), // easy, medium, hard
     estimatedHours: real("estimated_hours"), // Estimated time to complete
     status: text("status").default("assigned"), // assigned, in_progress, submitted, reviewed, completed
@@ -139,14 +138,14 @@ export const homework = sqliteTable("homework", {
 }));
 
 // Homework submissions
-export const homeworkSubmissions = sqliteTable("homework_submissions", {
-    id: text("id").primaryKey().$default(() => Bun.randomUUIDv7()),
-    homeworkId: text("homework_id").notNull().references(() => homework.id, { onDelete: 'cascade' }),
-    childId: text("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }),
+export const homeworkSubmissions = pgTable("homework_submissions", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    homeworkId: uuid("homework_id").notNull().references(() => homework.id, { onDelete: 'cascade' }),
+    childId: uuid("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }),
     submissionText: text("submission_text"), // Text content of the submission
     filesUrls: text("files_urls"), // JSON array of file URLs
     codeSnippets: text("code_snippets"), // JSON array of code submissions
-    submittedAt: integer("submitted_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+    submittedAt: timestamp("submitted_at").defaultNow(),
     status: text("status").default("submitted"), // submitted, reviewed, needs_revision, approved
     ...timestamps
 }, (table) => ({
@@ -155,16 +154,16 @@ export const homeworkSubmissions = sqliteTable("homework_submissions", {
 }));
 
 // Homework feedback and corrections
-export const homeworkFeedback = sqliteTable("homework_feedback", {
-    id: text("id").primaryKey().$default(() => Bun.randomUUIDv7()),
-    submissionId: text("submission_id").notNull().references(() => homeworkSubmissions.id, { onDelete: 'cascade' }),
-    teacherId: text("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
+export const homeworkFeedback = pgTable("homework_feedback", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    submissionId: uuid("submission_id").notNull().references(() => homeworkSubmissions.id, { onDelete: 'cascade' }),
+    teacherId: uuid("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
     grade: text("grade"), // A, B, C, D, F or numerical
     comments: text("comments").notNull(), // Teacher's comments
     mistakes: text("mistakes"), // JSON array of identified mistakes
     corrections: text("corrections"), // JSON array of corrections
     suggestions: text("suggestions"), // Suggestions for improvement
-    reviewedAt: integer("reviewed_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+    reviewedAt: timestamp("reviewed_at").defaultNow(),
     ...timestamps
 }, (table) => ({
     submissionIdIdx: index("homework_feedback_submission_id_idx").on(table.submissionId),
@@ -172,13 +171,13 @@ export const homeworkFeedback = sqliteTable("homework_feedback", {
 }));
 
 // Personal goals for each child
-export const childGoals = sqliteTable("child_goals", {
-    id: text("id").primaryKey().$default(() => Bun.randomUUIDv7()),
-    childId: text("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }),
-    teacherId: text("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
+export const childGoals = pgTable("child_goals", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    childId: uuid("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }),
+    teacherId: uuid("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
     title: text("title").notNull(),
     description: text("description").notNull(),
-    targetDate: integer("target_date", { mode: "timestamp" }),
+    targetDate: timestamp("target_date"),
     priority: text("priority").default("medium"), // low, medium, high
     status: text("status").default("active"), // active, completed, paused, cancelled
     progressPercentage: integer("progress_percentage").default(0),
@@ -191,17 +190,17 @@ export const childGoals = sqliteTable("child_goals", {
 }));
 
 // Messages between parents and teachers
-export const messages = sqliteTable("messages", {
-    id: text("id").primaryKey().$default(() => Bun.randomUUIDv7()),
-    senderId: text("sender_id").notNull(), // Can be parent or teacher ID
+export const messages = pgTable("messages", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    senderId: uuid("sender_id").notNull(), // Can be parent or teacher ID
     senderType: text("sender_type").notNull(), // "parent" or "teacher"
-    receiverId: text("receiver_id").notNull(), // Can be parent or teacher ID
+    receiverId: uuid("receiver_id").notNull(), // Can be parent or teacher ID
     receiverType: text("receiver_type").notNull(), // "parent" or "teacher"
-    childId: text("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }), // Context of the message
+    childId: uuid("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }), // Context of the message
     subject: text("subject"),
     content: text("content").notNull(),
-    isRead: integer("is_read", { mode: "boolean" }).default(false),
-    readAt: integer("read_at", { mode: "timestamp" }),
+    isRead: boolean("is_read").default(false),
+    readAt: timestamp("read_at"),
     priority: text("priority").default("normal"), // low, normal, high, urgent
     ...timestamps
 }, (table) => ({
@@ -212,10 +211,10 @@ export const messages = sqliteTable("messages", {
 }));
 
 // Child portfolio - projects, websites, games, etc.
-export const portfolioItems = sqliteTable("portfolio_items", {
-    id: text("id").primaryKey().$default(() => Bun.randomUUIDv7()),
-    childId: text("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }),
-    teacherId: text("teacher_id").references(() => teachers.id, { onDelete: 'cascade' }), // Teacher who helped/supervised
+export const portfolioItems = pgTable("portfolio_items", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    childId: uuid("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }),
+    teacherId: uuid("teacher_id").references(() => teachers.id, { onDelete: 'cascade' }), // Teacher who helped/supervised
     title: text("title").notNull(),
     description: text("description"),
     type: text("type").notNull(), // "website", "game", "app", "script", "project"
@@ -225,8 +224,8 @@ export const portfolioItems = sqliteTable("portfolio_items", {
     filesUrls: text("files_urls"), // JSON array of project files
     screenshots: text("screenshots"), // JSON array of screenshot URLs
     status: text("status").default("in_progress"), // in_progress, completed, archived
-    completedAt: integer("completed_at", { mode: "timestamp" }),
-    isPublic: integer("is_public", { mode: "boolean" }).default(false), // Visible to other parents/children
+    completedAt: timestamp("completed_at"),
+    isPublic: boolean("is_public").default(false), // Visible to other parents/children
     tags: text("tags"), // JSON array of tags for categorization
     ...timestamps
 }, (table) => ({
@@ -237,15 +236,15 @@ export const portfolioItems = sqliteTable("portfolio_items", {
 }));
 
 // Teacher-Child assignments (many-to-many relationship)
-export const teacherChildAssignments = sqliteTable("teacher_child_assignments", {
-    id: text("id").primaryKey().$default(() => Bun.randomUUIDv7()),
-    teacherId: text("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
-    childId: text("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }),
-    isPrimary: integer("is_primary", { mode: "boolean" }).default(false), // Primary teacher for the child
+export const teacherChildAssignments = pgTable("teacher_child_assignments", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    teacherId: uuid("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
+    childId: uuid("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }),
+    isPrimary: boolean("is_primary").default(false), // Primary teacher for the child
     subjects: text("subjects"), // JSON array of subjects this teacher teaches to this child
-    startDate: integer("start_date", { mode: "timestamp" }).notNull(),
-    endDate: integer("end_date", { mode: "timestamp" }),
-    isActive: integer("is_active", { mode: "boolean" }).default(true),
+    startDate: timestamp("start_date").notNull(),
+    endDate: timestamp("end_date"),
+    isActive: boolean("is_active").default(true),
     ...timestamps
 }, (table) => ({
     teacherIdIdx: index("teacher_child_assignments_teacher_id_idx").on(table.teacherId),

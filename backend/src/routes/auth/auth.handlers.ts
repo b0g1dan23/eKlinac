@@ -1,12 +1,12 @@
 import { AppRouteHandler, AuthContext } from "@/types";
-import { AdminLoginRoute, CreateTeacherRoute, LoginRoute, RefreshRoute, RegisterRoute } from "./auth.routes";
+import { AdminLoginRoute, CreateTeacherRoute, LoginRoute, LogoutRoute, RefreshRoute, RegisterRoute } from "./auth.routes";
 import { BAD_REQUEST, NOT_FOUND, OK, UNAUTHORIZED } from "@/helpers/http-status-codes";
 import db from "@/db";
 import { parents, teachers } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import env from "@/env";
-import { setCookie } from 'hono/cookie';
+import { setCookie, deleteCookie } from 'hono/cookie';
 import redisClient from "@/db/redis";
 import { Context } from "hono";
 
@@ -75,6 +75,13 @@ export const loginHandler: AppRouteHandler<LoginRoute> = async (c) => {
             const { passwordHash, ...parentWithoutPassword } = parent;
             return c.json({ user: parentWithoutPassword, accessToken: parentAccessToken }, OK);
     }
+}
+
+export const logoutHandler: AppRouteHandler<LogoutRoute, AuthContext> = async (c) => {
+    deleteCookie(c, 'refresh_token');
+    deleteCookie(c, 'access_token');
+    await redisClient.del(`refresh_token:${c.get('userID')}`);
+    return c.json({ message: 'Logged out successfully' }, OK);
 }
 
 export const refreshHandler: AppRouteHandler<RefreshRoute, AuthContext> = async (c) => {
