@@ -10,6 +10,11 @@ export const listAllTeachersRoute = createRoute({
     middleware: [verifyAdminAccess],
     tags: ["teachers"],
     description: "List all teachers in the system. Only for admins.",
+    request: {
+        cookies: z.object({
+            admin_token: z.string().openapi({ description: "Admin token for authentication" }),
+        })
+    },
     responses: {
         [OK]: jsonContent(z.array(teachersSelectSchema), "List of all teachers"),
     },
@@ -22,6 +27,9 @@ export const listAllStudentsForTeacherRoute = createRoute({
     middleware: [verifyAccessToken],
     description: "List all students for a specific teacher",
     request: {
+        headers: z.object({
+            Authorization: z.string().openapi({ description: "Bearer token for authentication" }),
+        }),
         params: z.object({
             teacherID: z.string().openapi({ description: "ID of the teacher to list students for" }),
         }),

@@ -44,6 +44,11 @@ export const logoutRoute = createRoute({
     tags: ['auth'],
     description: "User logout route. Invalidates the current session by clearing cookies.",
     middleware: [verifyRefreshToken],
+    request: {
+        cookies: z.object({
+            refresh_token: z.string().openapi({ description: "Refresh token to be invalidated" })
+        })
+    },
     responses: {
         [OK]: jsonContent(z.object({ message: z.string() }), "Successful logout response"),
         [UNAUTHORIZED]: jsonContent(z.object({ message: z.string() }), "Unauthorized access response"),
@@ -123,6 +128,9 @@ export const createTeacherRoute = createRoute({
     description: "Create a new teacher account. Only accessible by admins.",
     middleware: [verifyAdminAccess],
     request: {
+        cookies: z.object({
+            admin_token: z.string().openapi({ description: "Admin token for authentication" }),
+        }),
         body: jsonContentRequired(teachersInsertSchema, "Create teacher request body"),
     },
     responses: {
