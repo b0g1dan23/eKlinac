@@ -9,5 +9,8 @@ const authRouter = createRouter()
     .openapi(routes.registerRoute, handlers.registerHandler)
     .openapi(routes.adminLoginRoute, handlers.adminLoginHandler)
     .openapi(routes.createTeacherRoute, handlers.createTeacherHandler)
+    .openapi(routes.verifyEmailRoute, handlers.verifyEmailHandler)
+    .openapi(routes.googleLoginRoute, handlers.googleLoginHandler)
+    .openapi(routes.googleCallbackRoute, handlers.googleCallbackHandler)
 
 export default authRouter;

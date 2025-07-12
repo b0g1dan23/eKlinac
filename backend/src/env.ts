@@ -13,6 +13,14 @@ const EnvSchema = z.object({
     REDIS_URL: z.string().startsWith("redis://").or(z.string().startsWith("rediss://")),
     ADMIN_USERNAME: z.string().min(3, "Admin username must be at least 3 characters long"),
     ADMIN_PASSWORD: z.string().min(6, "Admin password must be at least 6 characters long"),
+    MAILJET_API_KEY: z.string(),
+    MAILJET_SECRET_KEY: z.string(),
+    EMAIL_FROM: z.string().email("Invalid email format for EMAIL_FROM"),
+    EMAIL_FROM_NAME: z.string().min(1, "EMAIL_FROM_NAME must not be empty"),
+    PROJECT_NAME: z.string().min(1, "PROJECT_NAME must not be empty"),
+    FRONTEND_URL: z.string().url("FRONTEND_URL must be a valid URL"),
+    GOOGLE_CLIENT_ID: z.string().min(1, "GOOGLE_CLIENT_ID must not be empty"),
+    GOOGLE_CLIENT_SECRET: z.string().min(1, "GOOGLE_CLIENT_SECRET must not be empty"),
 }).transform((data) => {
     if (data.NODE_ENV === 'test') {
         return {

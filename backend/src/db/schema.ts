@@ -9,7 +9,7 @@ const timestamps = {
 }
 
 // Teachers table
-export const teachers = pgTable("teachers", {
+export const teachersTable = pgTable("teachers", {
     id: uuid("id").primaryKey().defaultRandom(),
     email: text("email").unique().notNull(),
     firstName: text("first_name").notNull(),
@@ -21,10 +21,11 @@ export const teachers = pgTable("teachers", {
     ...timestamps
 });
 
-export const teachersSelectSchema = createSelectSchema(teachers).omit({
+export const teachersSelectSchema = createSelectSchema(teachersTable).omit({
     passwordHash: true,
 })
-export const teachersInsertSchema = createInsertSchema(teachers)
+
+export const teachersInsertSchema = createInsertSchema(teachersTable)
     .merge(z.object({
         password: z.string().min(6, "Password must be at least 6 characters long")
     }))
@@ -36,21 +37,23 @@ export const teachersInsertSchema = createInsertSchema(teachers)
     })
 
 // Parents table
-export const parents = pgTable("parents", {
+export const parentsTable = pgTable("parents", {
     id: uuid("id").primaryKey().defaultRandom(),
     email: text("email").unique().notNull(),
     firstName: text("first_name").notNull(),
     lastName: text("last_name").notNull(),
     passwordHash: text("password_hash").notNull(),
     phone: text("phone"),
+    googleId: text("google_id").unique(),
+    email_verified: boolean("email_verified").default(false),
     ...timestamps
 });
 
-export const parentsSelectSchema = createSelectSchema(parents)
+export const parentsSelectSchema = createSelectSchema(parentsTable)
     .omit({
         passwordHash: true,
     })
-export const parentsInsertSchema = createInsertSchema(parents)
+export const parentsInsertSchema = createInsertSchema(parentsTable)
     .merge(z.object({
         password: z.string().min(6, "Password must be at least 6 characters long")
     }))
@@ -61,14 +64,33 @@ export const parentsInsertSchema = createInsertSchema(parents)
         passwordHash: true,
     })
 
+// Email verification table - stores temporary verification codes
+export const emailVerificationsTable = pgTable("email_verifications", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    parentId: uuid("parent_id").notNull().references(() => parentsTable.id, { onDelete: 'cascade' }),
+    expiresAt: timestamp("expires_at").notNull(), // When this verification expires
+    ...timestamps
+}, (table) => ({
+    parentIdIdx: index("email_verifications_parent_id_idx").on(table.parentId),
+    expiresAtIdx: index("email_verifications_expires_at_idx").on(table.expiresAt)
+}));
+
+export const emailVerificationsSelectSchema = createSelectSchema(emailVerificationsTable);
+export const emailVerificationsInsertSchema = createInsertSchema(emailVerificationsTable)
+    .omit({
+        id: true,
+        createdAt: true,
+        updatedAt: true,
+    });
+
 // Children/Students table
-export const children = pgTable("children", {
+export const childrenTable = pgTable("children", {
     id: uuid("id").primaryKey().defaultRandom(),
     firstName: text("first_name").notNull(),
     lastName: text("last_name").notNull(),
     age: integer("age").notNull(),
-    parentId: uuid("parent_id").notNull().references(() => parents.id, { onDelete: 'cascade' }),
-    primaryTeacherId: uuid("primary_teacher_id").references(() => teachers.id, { onDelete: 'cascade' }),
+    parentId: uuid("parent_id").notNull().references(() => parentsTable.id, { onDelete: 'cascade' }),
+    primaryTeacherId: uuid("primary_teacher_id").references(() => teachersTable.id, { onDelete: 'cascade' }),
     programmingLevel: text("programming_level").default("beginner"), // beginner, intermediate, advanced
     notes: text("notes"), // General notes about the child
     isActive: boolean("is_active").default(true),
@@ -78,13 +100,13 @@ export const children = pgTable("children", {
     teacherIdIdx: index("children_teacher_id_idx").on(table.primaryTeacherId)
 }));
 
-export const childrenSelectSchema = createSelectSchema(children);
+export const childrenSelectSchema = createSelectSchema(childrenTable);
 
 // Lessons table
-export const lessons = pgTable("lessons", {
+export const lessonsTable = pgTable("lessons", {
     id: uuid("id").primaryKey().defaultRandom(),
-    teacherId: uuid("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
-    childId: uuid("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }),
+    teacherId: uuid("teacher_id").notNull().references(() => teachersTable.id, { onDelete: 'cascade' }),
+    childId: uuid("child_id").notNull().references(() => childrenTable.id, { onDelete: 'cascade' }),
     title: text("title").notNull(),
     description: text("description"),
     notes: text("notes"), // Teacher's notes from the lesson
@@ -102,9 +124,9 @@ export const lessons = pgTable("lessons", {
 }));
 
 // Lesson summaries (AI-generated summaries for parents)
-export const lessonSummaries = pgTable("lesson_summaries", {
+export const lessonSummariesTable = pgTable("lesson_summaries", {
     id: uuid("id").primaryKey().defaultRandom(),
-    lessonId: uuid("lesson_id").unique().notNull().references(() => lessons.id, { onDelete: 'cascade' }),
+    lessonId: uuid("lesson_id").unique().notNull().references(() => lessonsTable.id, { onDelete: 'cascade' }),
     topicsCovered: text("topics_covered"), // JSON array of topics
     childParticipation: text("child_participation"), // How the child participated
     strengths: text("strengths"), // What the child is doing well
@@ -117,11 +139,11 @@ export const lessonSummaries = pgTable("lesson_summaries", {
 }));
 
 // Homework table
-export const homework = pgTable("homework", {
+export const homeworkTable = pgTable("homework", {
     id: uuid("id").primaryKey().defaultRandom(),
-    lessonId: uuid("lesson_id").notNull().references(() => lessons.id, { onDelete: 'cascade' }),
-    childId: uuid("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }),
-    teacherId: uuid("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
+    lessonId: uuid("lesson_id").notNull().references(() => lessonsTable.id, { onDelete: 'cascade' }),
+    childId: uuid("child_id").notNull().references(() => childrenTable.id, { onDelete: 'cascade' }),
+    teacherId: uuid("teacher_id").notNull().references(() => teachersTable.id, { onDelete: 'cascade' }),
     title: text("title").notNull(),
     description: text("description").notNull(),
     instructions: text("instructions"), // Detailed instructions
@@ -138,10 +160,10 @@ export const homework = pgTable("homework", {
 }));
 
 // Homework submissions
-export const homeworkSubmissions = pgTable("homework_submissions", {
+export const homeworkSubmissionsTable = pgTable("homework_submissions", {
     id: uuid("id").primaryKey().defaultRandom(),
-    homeworkId: uuid("homework_id").notNull().references(() => homework.id, { onDelete: 'cascade' }),
-    childId: uuid("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }),
+    homeworkId: uuid("homework_id").notNull().references(() => homeworkTable.id, { onDelete: 'cascade' }),
+    childId: uuid("child_id").notNull().references(() => childrenTable.id, { onDelete: 'cascade' }),
     submissionText: text("submission_text"), // Text content of the submission
     filesUrls: text("files_urls"), // JSON array of file URLs
     codeSnippets: text("code_snippets"), // JSON array of code submissions
@@ -154,10 +176,10 @@ export const homeworkSubmissions = pgTable("homework_submissions", {
 }));
 
 // Homework feedback and corrections
-export const homeworkFeedback = pgTable("homework_feedback", {
+export const homeworkFeedbackTable = pgTable("homework_feedback", {
     id: uuid("id").primaryKey().defaultRandom(),
-    submissionId: uuid("submission_id").notNull().references(() => homeworkSubmissions.id, { onDelete: 'cascade' }),
-    teacherId: uuid("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
+    submissionId: uuid("submission_id").notNull().references(() => homeworkSubmissionsTable.id, { onDelete: 'cascade' }),
+    teacherId: uuid("teacher_id").notNull().references(() => teachersTable.id, { onDelete: 'cascade' }),
     grade: text("grade"), // A, B, C, D, F or numerical
     comments: text("comments").notNull(), // Teacher's comments
     mistakes: text("mistakes"), // JSON array of identified mistakes
@@ -171,10 +193,10 @@ export const homeworkFeedback = pgTable("homework_feedback", {
 }));
 
 // Personal goals for each child
-export const childGoals = pgTable("child_goals", {
+export const childGoalsTable = pgTable("child_goals", {
     id: uuid("id").primaryKey().defaultRandom(),
-    childId: uuid("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }),
-    teacherId: uuid("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
+    childId: uuid("child_id").notNull().references(() => childrenTable.id, { onDelete: 'cascade' }),
+    teacherId: uuid("teacher_id").notNull().references(() => teachersTable.id, { onDelete: 'cascade' }),
     title: text("title").notNull(),
     description: text("description").notNull(),
     targetDate: timestamp("target_date"),
@@ -190,13 +212,13 @@ export const childGoals = pgTable("child_goals", {
 }));
 
 // Messages between parents and teachers
-export const messages = pgTable("messages", {
+export const messagesTable = pgTable("messages", {
     id: uuid("id").primaryKey().defaultRandom(),
     senderId: uuid("sender_id").notNull(), // Can be parent or teacher ID
     senderType: text("sender_type").notNull(), // "parent" or "teacher"
     receiverId: uuid("receiver_id").notNull(), // Can be parent or teacher ID
     receiverType: text("receiver_type").notNull(), // "parent" or "teacher"
-    childId: uuid("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }), // Context of the message
+    childId: uuid("child_id").notNull().references(() => childrenTable.id, { onDelete: 'cascade' }), // Context of the message
     subject: text("subject"),
     content: text("content").notNull(),
     isRead: boolean("is_read").default(false),
@@ -211,10 +233,10 @@ export const messages = pgTable("messages", {
 }));
 
 // Child portfolio - projects, websites, games, etc.
-export const portfolioItems = pgTable("portfolio_items", {
+export const portfolioItemsTable = pgTable("portfolio_items", {
     id: uuid("id").primaryKey().defaultRandom(),
-    childId: uuid("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }),
-    teacherId: uuid("teacher_id").references(() => teachers.id, { onDelete: 'cascade' }), // Teacher who helped/supervised
+    childId: uuid("child_id").notNull().references(() => childrenTable.id, { onDelete: 'cascade' }),
+    teacherId: uuid("teacher_id").references(() => teachersTable.id, { onDelete: 'cascade' }), // Teacher who helped/supervised
     title: text("title").notNull(),
     description: text("description"),
     type: text("type").notNull(), // "website", "game", "app", "script", "project"
@@ -236,10 +258,10 @@ export const portfolioItems = pgTable("portfolio_items", {
 }));
 
 // Teacher-Child assignments (many-to-many relationship)
-export const teacherChildAssignments = pgTable("teacher_child_assignments", {
+export const teacherChildAssignmentsTable = pgTable("teacher_child_assignments", {
     id: uuid("id").primaryKey().defaultRandom(),
-    teacherId: uuid("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
-    childId: uuid("child_id").notNull().references(() => children.id, { onDelete: 'cascade' }),
+    teacherId: uuid("teacher_id").notNull().references(() => teachersTable.id, { onDelete: 'cascade' }),
+    childId: uuid("child_id").notNull().references(() => childrenTable.id, { onDelete: 'cascade' }),
     isPrimary: boolean("is_primary").default(false), // Primary teacher for the child
     subjects: text("subjects"), // JSON array of subjects this teacher teaches to this child
     startDate: timestamp("start_date").notNull(),
@@ -253,131 +275,139 @@ export const teacherChildAssignments = pgTable("teacher_child_assignments", {
 }));
 
 // Relations
-export const teachersRelations = relations(teachers, ({ many }) => ({
-    lessons: many(lessons),
-    homework: many(homework),
-    childGoals: many(childGoals),
-    homeworkFeedback: many(homeworkFeedback),
-    portfolioItems: many(portfolioItems),
-    teacherChildAssignments: many(teacherChildAssignments),
+export const teachersRelations = relations(teachersTable, ({ many }) => ({
+    lessons: many(lessonsTable),
+    homework: many(homeworkTable),
+    childGoals: many(childGoalsTable),
+    homeworkFeedback: many(homeworkFeedbackTable),
+    portfolioItems: many(portfolioItemsTable),
+    teacherChildAssignments: many(teacherChildAssignmentsTable),
 }));
 
-export const parentsRelations = relations(parents, ({ many }) => ({
-    children: many(children),
+export const parentsRelations = relations(parentsTable, ({ many }) => ({
+    children: many(childrenTable),
+    emailVerifications: many(emailVerificationsTable),
 }));
 
-export const childrenRelations = relations(children, ({ one, many }) => ({
-    parent: one(parents, {
-        fields: [children.parentId],
-        references: [parents.id],
+export const childrenRelations = relations(childrenTable, ({ one, many }) => ({
+    parent: one(parentsTable, {
+        fields: [childrenTable.parentId],
+        references: [parentsTable.id],
     }),
-    primaryTeacher: one(teachers, {
-        fields: [children.primaryTeacherId],
-        references: [teachers.id],
+    primaryTeacher: one(teachersTable, {
+        fields: [childrenTable.primaryTeacherId],
+        references: [teachersTable.id],
     }),
-    lessons: many(lessons),
-    homework: many(homework),
-    homeworkSubmissions: many(homeworkSubmissions),
-    childGoals: many(childGoals),
-    portfolioItems: many(portfolioItems),
-    teacherChildAssignments: many(teacherChildAssignments),
+    lessons: many(lessonsTable),
+    homework: many(homeworkTable),
+    homeworkSubmissions: many(homeworkSubmissionsTable),
+    childGoals: many(childGoalsTable),
+    portfolioItems: many(portfolioItemsTable),
+    teacherChildAssignments: many(teacherChildAssignmentsTable),
 }));
 
-export const lessonsRelations = relations(lessons, ({ one, many }) => ({
-    teacher: one(teachers, {
-        fields: [lessons.teacherId],
-        references: [teachers.id],
+export const lessonsRelations = relations(lessonsTable, ({ one, many }) => ({
+    teacher: one(teachersTable, {
+        fields: [lessonsTable.teacherId],
+        references: [teachersTable.id],
     }),
-    child: one(children, {
-        fields: [lessons.childId],
-        references: [children.id],
+    child: one(childrenTable, {
+        fields: [lessonsTable.childId],
+        references: [childrenTable.id],
     }),
-    homework: many(homework),
-    lessonSummary: one(lessonSummaries),
+    homework: many(homeworkTable),
+    lessonSummary: one(lessonSummariesTable),
 }));
 
-export const lessonSummariesRelations = relations(lessonSummaries, ({ one }) => ({
-    lesson: one(lessons, {
-        fields: [lessonSummaries.lessonId],
-        references: [lessons.id],
-    }),
-}));
-
-export const homeworkRelations = relations(homework, ({ one, many }) => ({
-    lesson: one(lessons, {
-        fields: [homework.lessonId],
-        references: [lessons.id],
-    }),
-    child: one(children, {
-        fields: [homework.childId],
-        references: [children.id],
-    }),
-    teacher: one(teachers, {
-        fields: [homework.teacherId],
-        references: [teachers.id],
-    }),
-    submissions: many(homeworkSubmissions),
-}));
-
-export const homeworkSubmissionsRelations = relations(homeworkSubmissions, ({ one, many }) => ({
-    homework: one(homework, {
-        fields: [homeworkSubmissions.homeworkId],
-        references: [homework.id],
-    }),
-    child: one(children, {
-        fields: [homeworkSubmissions.childId],
-        references: [children.id],
-    }),
-    feedback: many(homeworkFeedback),
-}));
-
-export const homeworkFeedbackRelations = relations(homeworkFeedback, ({ one }) => ({
-    submission: one(homeworkSubmissions, {
-        fields: [homeworkFeedback.submissionId],
-        references: [homeworkSubmissions.id],
-    }),
-    teacher: one(teachers, {
-        fields: [homeworkFeedback.teacherId],
-        references: [teachers.id],
+export const lessonSummariesRelations = relations(lessonSummariesTable, ({ one }) => ({
+    lesson: one(lessonsTable, {
+        fields: [lessonSummariesTable.lessonId],
+        references: [lessonsTable.id],
     }),
 }));
 
-export const childGoalsRelations = relations(childGoals, ({ one }) => ({
-    child: one(children, {
-        fields: [childGoals.childId],
-        references: [children.id],
+export const homeworkRelations = relations(homeworkTable, ({ one, many }) => ({
+    lesson: one(lessonsTable, {
+        fields: [homeworkTable.lessonId],
+        references: [lessonsTable.id],
     }),
-    teacher: one(teachers, {
-        fields: [childGoals.teacherId],
-        references: [teachers.id],
+    child: one(childrenTable, {
+        fields: [homeworkTable.childId],
+        references: [childrenTable.id],
+    }),
+    teacher: one(teachersTable, {
+        fields: [homeworkTable.teacherId],
+        references: [teachersTable.id],
+    }),
+    submissions: many(homeworkSubmissionsTable),
+}));
+
+export const homeworkSubmissionsRelations = relations(homeworkSubmissionsTable, ({ one, many }) => ({
+    homework: one(homeworkTable, {
+        fields: [homeworkSubmissionsTable.homeworkId],
+        references: [homeworkTable.id],
+    }),
+    child: one(childrenTable, {
+        fields: [homeworkSubmissionsTable.childId],
+        references: [childrenTable.id],
+    }),
+    feedback: many(homeworkFeedbackTable),
+}));
+
+export const homeworkFeedbackRelations = relations(homeworkFeedbackTable, ({ one }) => ({
+    submission: one(homeworkSubmissionsTable, {
+        fields: [homeworkFeedbackTable.submissionId],
+        references: [homeworkSubmissionsTable.id],
+    }),
+    teacher: one(teachersTable, {
+        fields: [homeworkFeedbackTable.teacherId],
+        references: [teachersTable.id],
     }),
 }));
 
-export const messagesRelations = relations(messages, ({ one }) => ({
-    child: one(children, {
-        fields: [messages.childId],
-        references: [children.id],
+export const childGoalsRelations = relations(childGoalsTable, ({ one }) => ({
+    child: one(childrenTable, {
+        fields: [childGoalsTable.childId],
+        references: [childrenTable.id],
+    }),
+    teacher: one(teachersTable, {
+        fields: [childGoalsTable.teacherId],
+        references: [teachersTable.id],
     }),
 }));
 
-export const portfolioItemsRelations = relations(portfolioItems, ({ one }) => ({
-    child: one(children, {
-        fields: [portfolioItems.childId],
-        references: [children.id],
-    }),
-    teacher: one(teachers, {
-        fields: [portfolioItems.teacherId],
-        references: [teachers.id],
+export const messagesRelations = relations(messagesTable, ({ one }) => ({
+    child: one(childrenTable, {
+        fields: [messagesTable.childId],
+        references: [childrenTable.id],
     }),
 }));
 
-export const teacherChildAssignmentsRelations = relations(teacherChildAssignments, ({ one }) => ({
-    teacher: one(teachers, {
-        fields: [teacherChildAssignments.teacherId],
-        references: [teachers.id],
+export const portfolioItemsRelations = relations(portfolioItemsTable, ({ one }) => ({
+    child: one(childrenTable, {
+        fields: [portfolioItemsTable.childId],
+        references: [childrenTable.id],
     }),
-    child: one(children, {
-        fields: [teacherChildAssignments.childId],
-        references: [children.id],
+    teacher: one(teachersTable, {
+        fields: [portfolioItemsTable.teacherId],
+        references: [teachersTable.id],
+    }),
+}));
+
+export const teacherChildAssignmentsRelations = relations(teacherChildAssignmentsTable, ({ one }) => ({
+    teacher: one(teachersTable, {
+        fields: [teacherChildAssignmentsTable.teacherId],
+        references: [teachersTable.id],
+    }),
+    child: one(childrenTable, {
+        fields: [teacherChildAssignmentsTable.childId],
+        references: [childrenTable.id],
+    }),
+}));
+
+export const emailVerificationsRelations = relations(emailVerificationsTable, ({ one }) => ({
+    parent: one(parentsTable, {
+        fields: [emailVerificationsTable.parentId],
+        references: [parentsTable.id],
     }),
 }));

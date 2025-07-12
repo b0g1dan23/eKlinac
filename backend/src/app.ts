@@ -19,6 +19,16 @@ configureCORS(app);
 configureOpenAPI(app);
 routes.forEach(route => app.route("/api/v1/", route));
 
+// Health check endpoint for Docker
+app.get('/health', c => {
+    return c.json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        environment: process.env.NODE_ENV || 'development'
+    }, 200);
+})
+
 app.get('/', c => {
     return c.json({ message: 'Hello, World!' }, 200);
 })
